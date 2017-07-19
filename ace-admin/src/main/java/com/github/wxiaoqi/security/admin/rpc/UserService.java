@@ -31,7 +31,7 @@ import java.util.List;
  * @create 2017-06-21 8:15
  */
 @Controller
-@RequestMapping("")
+@RequestMapping("api")
 public class UserService {
     @Autowired
     private UserBiz userBiz;
@@ -61,7 +61,7 @@ public class UserService {
             info = new PermissionInfo();
             info.setCode(menu.getCode());
             info.setType(CommonConstant.RESOURCE_TYPE_MENU);
-            info.setName(menu.getTitle());
+            info.setName(CommonConstant.RESOURCE_ACTION_VISIT);
             String uri = menu.getHref();
             if(!uri.startsWith("/"))
                 uri = "/"+uri;
@@ -69,6 +69,7 @@ public class UserService {
             info.setMethod(CommonConstant.RESOURCE_REQUEST_METHOD_GET);
             result.add(info
             );
+            info.setMenu(menu.getTitle());
         }
         List<Element> elements = elementBiz.getAuthorityElementByUserId(user.getId()+"");
         for(Element element:elements){
@@ -78,6 +79,7 @@ public class UserService {
             info.setUri(element.getUri());
             info.setMethod(element.getMethod());
             info.setName(element.getName());
+            info.setMenu(element.getMenuId());
             result.add(info);
         }
         return result;

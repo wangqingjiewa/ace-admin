@@ -3,18 +3,30 @@ logging:
         tk.mybatis: DEBUG
         com.github.wxiaoqi.security.admin: DEBUG
   #  config: classpath:logback.xml
+<<<<<<< HEAD
     path: ~/ag/admin
+=======
+    # path: /ag/admin
+>>>>>>> d023445b09c86d47a04f69bef29ec943c5f97bdf
 spring:
     application:
-        name: back
-    boot:
-        admin:
-             url: http://localhost:8764
+        name: admin-back
+    jackson:
+        date-format: yyyy-MM-dd HH:mm:ss
+        time-zone: GMT+8
+        default-property-inclusion: non_null
+#    boot:
+#        admin:
+#             url: http://localhost:8764
     datasource:
         name: test
         url: jdbc:mysql://localhost:3306/ag_admin?useUnicode=true&characterEncoding=UTF8
         username: root
+<<<<<<< HEAD
         password: root
+=======
+        password: 123456
+>>>>>>> d023445b09c86d47a04f69bef29ec943c5f97bdf
         # 使用druid数据源
         type: com.alibaba.druid.pool.DruidDataSource
         driver-class-name: com.mysql.jdbc.Driver
@@ -40,14 +52,25 @@ server:
 
 eureka:
     instance:
-        statusPageUrlPath: ${management.context-path}/info
-        healthCheckUrlPath: ${management.context-path}/health
+        statusPageUrlPath: /info
+        healthCheckUrlPath: /health
+        # docker 部署开启
+#        prefer-ip-address: true
+#        ip-address: 127.0.0.1
     client:
         serviceUrl:
             defaultZone: http://localhost:8761/eureka/
+                    # docker 部署开启
+#            defaultZone: http://center:8761/eureka/
 swagger:
-    basepackage: com.github.wxiaoqi.security.admin.rest
+    basepackage: com.github.wxiaoqi.security.admin
     service:
+<<<<<<< HEAD
         name: ace-admin
         description: ace-admin后端服务接口
         developer: jfrog
+=======
+        name: Admin Back
+        description: Admin Back后端服务
+        developer: 老A
+>>>>>>> d023445b09c86d47a04f69bef29ec943c5f97bdf

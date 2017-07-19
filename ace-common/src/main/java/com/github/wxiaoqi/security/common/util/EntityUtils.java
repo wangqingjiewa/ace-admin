@@ -1,12 +1,15 @@
 package com.github.wxiaoqi.security.common.util;
 
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
 import java.lang.reflect.Field;
+import java.net.URLDecoder;
 import java.sql.Timestamp;
 import java.util.Date;
 import javax.servlet.http.HttpServletRequest;
 
 
-import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * 实体类相关工具类 
@@ -22,7 +25,6 @@ public class EntityUtils {
 	 * 快速将bean的crtUser、crtHost、crtTime、updUser、updHost、updTime附上相关值
 	 * 
 	 * @param entity 实体bean 
-	 * 		user类型为com.neusoft.unieap.techcomp.org.entity.User，time类型为Timestamp
 	 * @author 王浩彬
 	 */
 	public static <T> void setCreatAndUpdatInfo(T entity) {
@@ -34,25 +36,26 @@ public class EntityUtils {
 	 * 快速将bean的crtUser、crtHost、crtTime附上相关值
 	 * 
 	 * @param entity 实体bean
-	 * 		user类型为com.neusoft.unieap.techcomp.org.entity.User，time类型为Timestamp
 	 * @author 王浩彬
 	 */
 	public static <T> void setCreateInfo(T entity){
-//		RequestContextHolder
-//		HttpServletRequest request = (HttpServletRequest) UnieapRequestContextHolder.getRequestContext()
-//				.get("currentRequest");
+		HttpServletRequest request = ((ServletRequestAttributes)RequestContextHolder.getRequestAttributes()).getRequest();
 		String hostIp = "";
-//		if(request!=null)
-//			hostIp = ClientUtil.getClientIp(request);
+		String name = "";
+		String id = "";
+		if(request!=null) {
+			hostIp = String.valueOf(request.getHeader("userHost"));
+			name = String.valueOf(request.getHeader("userName"));
+			name = URLDecoder.decode(name);
+			id = String.valueOf(request.getHeader("userId"));
+		}
 		// 默认属性
-		String[] fields = {"crtUser","crtHost","crtTime"};
+		String[] fields = {"crtName","crtUser","crtHost","crtTime"};
 		Field field = ReflectionUtils.getAccessibleField(entity, "crtTime");
 		// 默认值
 		Object [] value = null;
 		if(field!=null&&field.getType().equals(Date.class)){
-			value = new Object []{hostIp,new Date()};
-		}else{
-			value = new Object []{hostIp,new Timestamp(new Date().getTime())};
+			value = new Object []{name,id,hostIp,new Date()};
 		}
 		// 填充默认属性值
 		setDefaultValues(entity, fields, value);
@@ -62,22 +65,25 @@ public class EntityUtils {
 	 * 快速将bean的updUser、updHost、updTime附上相关值
 	 * 
 	 * @param entity 实体bean
-	 * 		user类型为com.neusoft.unieap.techcomp.org.entity.User，time类型为Timestamp
 	 * @author 王浩彬
 	 */
 	public static <T> void setUpdatedInfo(T entity){
-//		User user = UniEAPContextHolder.getContext().getCurrentUser();
-//		HttpServletRequest request = (HttpServletRequest) UnieapRequestContextHolder.getRequestContext()
-//				.get("currentRequest");
+		HttpServletRequest request = ((ServletRequestAttributes)RequestContextHolder.getRequestAttributes()).getRequest();
 		String hostIp = "";
-//		if(request!=null)
-//			hostIp = ClientUtil.getClientIp(request);
+		String name = "";
+		String id = "";
+		if(request!=null) {
+			hostIp = String.valueOf(request.getHeader("userHost"));
+			name = String.valueOf(request.getHeader("userName"));
+			name = URLDecoder.decode(name);
+			id = String.valueOf(request.getHeader("userId"));
+		}
 		// 默认属性
-		String[] fields = {"updUser","updHost","updTime"};
+		String[] fields = {"updName","updUser","updHost","updTime"};
 		Field field = ReflectionUtils.getAccessibleField(entity, "updTime");
 		Object [] value = null;
 		if(field!=null&&field.getType().equals(Date.class)){
-			value = new Object []{hostIp,new Date()};
+			value = new Object []{name,id,hostIp,new Date()};
 		}
 		// 填充默认属性值
 		setDefaultValues(entity, fields, value);

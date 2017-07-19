@@ -1,22 +1,21 @@
 package com.github.wxiaoqi.security.gate.filter;
 
 import com.github.wxiaoqi.security.api.vo.authority.PermissionInfo;
+import com.github.wxiaoqi.security.api.vo.log.LogInfo;
 import com.github.wxiaoqi.security.api.vo.user.UserInfo;
+import com.github.wxiaoqi.security.common.util.ClientUtil;
+import com.github.wxiaoqi.security.gate.rpc.ILogService;
 import com.github.wxiaoqi.security.gate.rpc.IUserService;
+import com.github.wxiaoqi.security.gate.utils.DBLog;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.netflix.zuul.ZuulFilter;
 import com.netflix.zuul.context.RequestContext;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.security.SecurityProperties;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
 import org.springframework.stereotype.Component;
@@ -24,8 +23,8 @@ import org.springframework.util.Base64Utils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import java.util.Collection;
-import java.util.List;
+import java.net.URLEncoder;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -41,6 +40,8 @@ public class SessionAccessFilter extends ZuulFilter {
     private SessionRepository<?> repository;
     @Autowired
     private IUserService userService;
+    @Autowired
+    private ILogService logService;
 
     @Value("${gate.ignore.startWith}")
     private String startWith;
@@ -48,6 +49,10 @@ public class SessionAccessFilter extends ZuulFilter {
     private String contain;
     @Value("${gate.oauth.prefix}")
     private String oauthPrefix;
+
+    public SessionAccessFilter() {
+        super();
+    }
 
     @Override
     public String filterType() {
@@ -71,18 +76,31 @@ public class SessionAccessFilter extends ZuulFilter {
         HttpServletRequest request = ctx.getRequest();
         final String requestUri = request.getRequestURI();
         final String method = request.getMethod();
+        User user = getSessionUser(httpSession);
+        String username = null;
+        if(user!=null) {
+             username = user.getUsername();
+            // 设置头部校验信息
+            ctx.addZuulRequestHeader("Authorization",
+                    Base64Utils.encodeToString(user.getUsername().getBytes()));
+            // 查找合法链接
+        }
         // 不进行拦截的地址
         if (isStartWith(requestUri) || isContains(requestUri)|| isOAuth(requestUri))
             return null;
-        User user = getSessionUser(httpSession);
-        String username = user.getUsername();
-        List<PermissionInfo> permissionInfos = getPermissionInfos(request, username);
-        // 查找合法链接
-        checkAllow(requestUri, method, permissionInfos);
-        // 设置头部校验信息
-        ctx.addZuulRequestHeader("Authorization",
-                Base64Utils.encodeToString(user.getUsername().getBytes()));
+        if(username!=null)
+            checkAllow(requestUri, method, ctx, username);
         return null;
+    }
+
+    private void setCurrentUserInfoAndLog(RequestContext ctx, String username, PermissionInfo pm) {
+        UserInfo info = userService.getUserByUsername(username);
+        String host =  ClientUtil.getClientIp(ctx.getRequest());
+        ctx.addZuulRequestHeader("userId", info.getId());
+        ctx.addZuulRequestHeader("userName", URLEncoder.encode(info.getName()));
+        ctx.addZuulRequestHeader("userHost", ClientUtil.getClientIp(ctx.getRequest()));
+        LogInfo logInfo = new LogInfo(pm.getMenu(),pm.getName(),pm.getUri(),new Date(),info.getId(),info.getName(),host);
+        DBLog.getInstance().setLogService(logService).offerQueue(logInfo);
     }
 
     /**
@@ -101,6 +119,8 @@ public class SessionAccessFilter extends ZuulFilter {
      */
     private User getSessionUser(HttpSession httpSession) {
         Session session = repository.getSession(httpSession.getId());
+        if(httpSession.getAttribute("SPRING_SECURITY_CONTEXT")==null)
+            return null;
         SecurityContextImpl securityContextImpl =
                 (SecurityContextImpl) httpSession.getAttribute("SPRING_SECURITY_CONTEXT");
         return (User) securityContextImpl.getAuthentication().getPrincipal();
@@ -115,7 +135,7 @@ public class SessionAccessFilter extends ZuulFilter {
     private List<PermissionInfo> getPermissionInfos(HttpServletRequest request, String username) {
         List<PermissionInfo> permissionInfos;
         if (request.getSession().getAttribute("permission") == null) {
-            permissionInfos = userService.getPermissionByUserId(username);
+            permissionInfos = userService.getPermissionByUsername(username);
             request.getSession().setAttribute("permission", permissionInfos);
         } else {
             permissionInfos = (List<PermissionInfo>) request.getSession().getAttribute("permission");
@@ -127,10 +147,10 @@ public class SessionAccessFilter extends ZuulFilter {
      * 权限校验
      * @param requestUri
      * @param method
-     * @param permissionInfos
      */
-    private void checkAllow(final String requestUri, final String method, List<PermissionInfo> permissionInfos) {
+    private void checkAllow(final String requestUri, final String method ,RequestContext ctx,String username) {
         log.debug("uri：" + requestUri + "----method：" + method);
+        List<PermissionInfo> permissionInfos = getPermissionInfos(ctx.getRequest(), username) ;
         Collection<PermissionInfo> result =
                 Collections2.filter(permissionInfos, new Predicate<PermissionInfo>() {
                     @Override
@@ -144,6 +164,12 @@ public class SessionAccessFilter extends ZuulFilter {
                 });
         if (result.size() <= 0) {
             setFailedRequest("403 Forbidden!", 403);
+        } else{
+            PermissionInfo[] pms =  result.toArray(new PermissionInfo[]{});
+            PermissionInfo pm = pms[0];
+            if(!method.equals("GET")){
+                setCurrentUserInfoAndLog(ctx, username, pm);
+            }
         }
     }
 
